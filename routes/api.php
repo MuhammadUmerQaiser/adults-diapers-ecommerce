@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Api\AuthController;
+use App\Http\Controllers\Api\CartController;
 use App\Http\Controllers\Api\ProductController;
 use App\Http\Controllers\Api\SocialLoginController;
 use Illuminate\Http\Request;
@@ -36,6 +37,24 @@ Route::controller(ProductController::class)->group(function () {
     Route::get('/products', 'index')->name('products.index');
     Route::get('/products/{slug}', 'show')->name('products.show');
 });
+
+Route::controller(CartController::class)->prefix('cart')->group(function () {
+    Route::get('/', 'index')->name('cart.index');        // Get cart items
+    Route::get('/quantity', 'quantity')->name('cart.quantity');  // Navbar badge count
+    Route::post('/', 'addOrUpdate')->name('cart.add');    // Add / +1 / -1
+    Route::delete('/item', 'remove')->name('cart.remove');      // Force remove item
+    Route::delete('/', 'clear')->name('cart.clear');        // Clear entire cart
+});
+
+
+//AUTH USER ROUTES
+Route::middleware('auth:api')->group(function () {
+    Route::controller(CartController::class)->prefix('cart')->group(function () {
+        Route::post('/merge', 'merge')->name('cart.merge'); // guest → user cart merge
+    });
+});
+
+//ADMIN ROUTES
 
 Route::middleware(['auth:api', 'admin'])->group(function () {
     Route::controller(ProductController::class)->group(function () {
