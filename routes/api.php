@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\CartController;
+use App\Http\Controllers\Api\OrderController;
 use App\Http\Controllers\Api\ProductController;
 use App\Http\Controllers\Api\SocialLoginController;
 use Illuminate\Http\Request;
@@ -18,6 +19,7 @@ Route::controller(GlobalController::class)->group(function () {
     Route::get('/get-sizes', 'getAllSizes')->name('get-sizes');
     Route::get('/get-categories', 'getAllCategories')->name('get-categories');
     Route::get('/get-roles', 'getAllRoles')->name('get-roles');
+    Route::get('/get-shipping-methods', 'getAllShippingMethods')->name('get-shipping-methods');
 });
 
 Route::controller(AuthController::class)->group(function () {
@@ -46,11 +48,21 @@ Route::controller(CartController::class)->prefix('cart')->group(function () {
     Route::delete('/', 'clear')->name('cart.clear');        // Clear entire cart
 });
 
+Route::post('/webhook/stripe', [OrderController::class, 'webhook'])->name('webhook.stripe');
 
 //AUTH USER ROUTES
 Route::middleware('auth:api')->group(function () {
     Route::controller(CartController::class)->prefix('cart')->group(function () {
         Route::post('/merge', 'merge')->name('cart.merge'); // guest → user cart merge
+    });
+
+    Route::controller(OrderController::class)->prefix('orders')->group(function () {
+        // Route::post('/', 'store')->name('orders.store');                         // Place order
+        Route::post('/checkout', 'checkout')->name('orders.checkout');
+        Route::get('/', 'index')->name('orders.index');                          // My orders
+        Route::get('/{orderNumber}', 'show')->name('orders.show');               // Single order
+        Route::get('/session/{sessionId}', 'showBySession')->name('orders.session');
+        Route::patch('/{orderNumber}/cancel', 'cancel')->name('orders.cancel'); // Cancel order
     });
 });
 
@@ -61,5 +73,10 @@ Route::middleware(['auth:api', 'admin'])->group(function () {
         Route::post('/products', 'store')->name('products.store');
         Route::post('/products/{id}', 'update')->name('products.update');
         Route::delete('/products/{id}', 'destroy')->name('products.destroy');
+    });
+
+    Route::controller(OrderController::class)->prefix('admin/orders')->group(function () {
+        Route::get('/', 'adminIndex')->name('admin.orders.index');                              // All orders (filter by ?status=)
+        Route::patch('/{orderNumber}/status', 'updateStatus')->name('admin.orders.status');    // Update status
     });
 });

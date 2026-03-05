@@ -13,7 +13,7 @@ class Cart extends Model
     const CART_SESSION_PREFIX = 'cart_';
     const CART_SESSION_LIFETIME = 60 * 24 * 45; // 45 days in minutes
 
-    private function getSessionKey(string $cartToken): string
+    private function getSessionKey(?string $cartToken): string
     {
         if (auth()->check()) {
             return self::CART_SESSION_PREFIX . 'user_' . auth()->id();
@@ -21,12 +21,12 @@ class Cart extends Model
         return self::CART_SESSION_PREFIX . $cartToken;
     }
 
-    private function getCartFromSession(string $cartToken): array
+    private function getCartFromSession(?string $cartToken): array
     {
         return Session::get($this->getSessionKey($cartToken), []);
     }
 
-    private function saveCartToSession(string $cartToken, array $cartItems): void
+    private function saveCartToSession(?string $cartToken, array $cartItems): void
     {
         Session::put($this->getSessionKey($cartToken), $cartItems);
         Session::put(
@@ -35,7 +35,7 @@ class Cart extends Model
         );
     }
 
-    private function isCartExpired(string $cartToken): bool
+    private function isCartExpired(?string $cartToken): bool
     {
         $expiresAt = Session::get($this->getSessionKey($cartToken) . '_expires_at');
         if (!$expiresAt)
@@ -234,7 +234,7 @@ class Cart extends Model
     {
         try {
             $guestSessionKey = self::CART_SESSION_PREFIX . $request->guest_cart_token;
-            $userSessionKey  = $this->getSessionKey($request->guest_cart_token); 
+            $userSessionKey = $this->getSessionKey($request->guest_cart_token);
 
             $guestCart = $this->getCartFromSession($guestSessionKey);
             $userCart = $this->getCartFromSession($userSessionKey);
