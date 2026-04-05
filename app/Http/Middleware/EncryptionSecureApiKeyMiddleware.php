@@ -15,9 +15,16 @@ class EncryptionSecureApiKeyMiddleware
      */
     public function handle(Request $request, Closure $next): Response
     {
-        if ($request->header('X-API-KEY') !== env('SECURE_ENCRYPTION_API_KEY')) {
+        $apiKey = $request->header('X-API-KEY');
+        $expectedKey = config('secure.encryption_api_key');
+
+        \Log::info('Received Key: ' . $apiKey);
+        \Log::info('Expected Key: ' . $expectedKey);
+
+        if (!$apiKey || $apiKey !== $expectedKey) {
             return api_error('Invalid or missing API key.', 401);
         }
+
         return $next($request);
     }
 }
