@@ -230,35 +230,82 @@ class Cart extends Model
     /**
      * MERGE GUEST CART INTO USER CART (call after login)
      */
+    // public function mergeCarts(Request $request)
+    // {
+    //     try {
+    //         $guestSessionKey = self::CART_SESSION_PREFIX . $request->guest_cart_token;
+    //         $userSessionKey = $this->getSessionKey($request->guest_cart_token);
+
+    //         $guestCart = $this->getCartFromSession($guestSessionKey);
+    //         $userCart = $this->getCartFromSession($userSessionKey);
+
+    //         foreach ($guestCart as $variationId => $guestItem) {
+    //             if (isset($userCart[$variationId])) {
+    //                 $newQty = $userCart[$variationId]['quantity'] + $guestItem['quantity'];
+    //                 $userCart[$variationId]['quantity'] = $newQty;
+    //                 $userCart[$variationId]['subtotal'] = round($userCart[$variationId]['price'] * $newQty, 2);
+    //             } else {
+    //                 $userCart[$variationId] = $guestItem;
+    //             }
+    //         }
+
+    //         $this->saveCartToSession($userSessionKey, $userCart);
+
+    //         Session::forget($this->getSessionKey($guestSessionKey));
+    //         Session::forget($this->getSessionKey($guestSessionKey) . '_expires_at');
+
+    //         return api_success([
+    //             'cart' => array_values($userCart),
+    //             'summary' => $this->calculateSummary($userCart),
+    //         ], 'Cart merged successfully.');
+
+    //     } catch (\Exception $e) {
+    //         return api_error('Something went wrong while merging carts.', 500, $e->getMessage());
+    //     }
+    // }
     public function mergeCarts(Request $request)
     {
         try {
-            $guestSessionKey = self::CART_SESSION_PREFIX . $request->guest_cart_token;
-            $userSessionKey = $this->getSessionKey($request->guest_cart_token);
+            // if (!auth()->check()) {
+            //     return api_error('Unauthorized', 401);
+            // }
 
-            $guestCart = $this->getCartFromSession($guestSessionKey);
-            $userCart = $this->getCartFromSession($userSessionKey);
+            // $request->validate([
+            //     'guest_cart_token' => 'required|string',
+            // ]);
+
+            $guestToken = $request->guest_cart_token;
+
+            $guestSessionKey = self::CART_SESSION_PREFIX . $guestToken;              // cart_{guest_token}
+            $userSessionKey = self::CART_SESSION_PREFIX . 'user_' . auth()->id();    // cart_user_{id}
+
+            $guestCart = Session::get($guestSessionKey, []);
+            $userCart = Session::get($userSessionKey, []);
 
             foreach ($guestCart as $variationId => $guestItem) {
                 if (isset($userCart[$variationId])) {
-                    $newQty = $userCart[$variationId]['quantity'] + $guestItem['quantity'];
+                    $newQty = (int) $userCart[$variationId]['quantity'] + (int) $guestItem['quantity'];
                     $userCart[$variationId]['quantity'] = $newQty;
-                    $userCart[$variationId]['subtotal'] = round($userCart[$variationId]['price'] * $newQty, 2);
+                    $userCart[$variationId]['subtotal'] = round(((float) $userCart[$variationId]['price']) * $newQty, 2);
                 } else {
                     $userCart[$variationId] = $guestItem;
                 }
             }
 
-            $this->saveCartToSession($userSessionKey, $userCart);
+            Session::put($userSessionKey, $userCart);
+            Session::put(
+                $userSessionKey . '_expires_at',
+                now()->addMinutes(self::CART_SESSION_LIFETIME)->toDateTimeString()
+            );
 
-            Session::forget($this->getSessionKey($guestSessionKey));
-            Session::forget($this->getSessionKey($guestSessionKey) . '_expires_at');
+            // guest cart cleanup
+            Session::forget($guestSessionKey);
+            Session::forget($guestSessionKey . '_expires_at');
 
             return api_success([
                 'cart' => array_values($userCart),
                 'summary' => $this->calculateSummary($userCart),
             ], 'Cart merged successfully.');
-
         } catch (\Exception $e) {
             return api_error('Something went wrong while merging carts.', 500, $e->getMessage());
         }
