@@ -266,14 +266,6 @@ class Cart extends Model
     public function mergeCarts(Request $request)
     {
         try {
-            // if (!auth()->check()) {
-            //     return api_error('Unauthorized', 401);
-            // }
-
-            // $request->validate([
-            //     'guest_cart_token' => 'required|string',
-            // ]);
-
             $guestToken = $request->guest_cart_token;
 
             $guestSessionKey = self::CART_SESSION_PREFIX . $guestToken;              // cart_{guest_token}
@@ -282,12 +274,53 @@ class Cart extends Model
             $guestCart = Session::get($guestSessionKey, []);
             $userCart = Session::get($userSessionKey, []);
 
+            // Guest cart empty ho to direct user cart return
+            if (empty($guestCart)) {
+                return api_success([
+                    'cart' => array_values($userCart),
+                    'summary' => $this->calculateSummary($userCart),
+                ], 'No guest cart items to merge.');
+            }
+
+            // Stock-safe merge (same variation pe quantity double nahi hogi)
+            $variationIds = array_unique(array_merge(array_keys($guestCart), array_keys($userCart)));
+            $variations = ProductVariation::query()
+                ->whereIn('id', $variationIds)
+                ->where('is_active', 1)
+                ->get()
+                ->keyBy('id');
+
             foreach ($guestCart as $variationId => $guestItem) {
+                // Invalid/inactive variation skip
+                if (!isset($variations[$variationId])) {
+                    continue;
+                }
+
+                $stock = (int) $variations[$variationId]->stock;
+                if ($stock < 1) {
+                    continue;
+                }
+
+                $guestQty = (int) ($guestItem['quantity'] ?? 0);
+                $guestQty = min(max($guestQty, 1), $stock);
+
                 if (isset($userCart[$variationId])) {
-                    $newQty = (int) $userCart[$variationId]['quantity'] + (int) $guestItem['quantity'];
-                    $userCart[$variationId]['quantity'] = $newQty;
-                    $userCart[$variationId]['subtotal'] = round(((float) $userCart[$variationId]['price']) * $newQty, 2);
+                    $userQty = (int) ($userCart[$variationId]['quantity'] ?? 0);
+
+                    // IMPORTANT: same variation par add (+) nahi karna
+                    // Highest qty rakh rahe hain taake item lose na ho aur double na ho
+                    $finalQty = min(max($userQty, $guestQty), $stock);
+
+                    $userCart[$variationId]['quantity'] = $finalQty;
+                    $userCart[$variationId]['price'] = (float) $variations[$variationId]->price;
+                    $userCart[$variationId]['stock'] = $stock;
+                    $userCart[$variationId]['subtotal'] = round(((float) $userCart[$variationId]['price']) * $finalQty, 2);
                 } else {
+                    $guestItem['quantity'] = $guestQty;
+                    $guestItem['price'] = (float) $variations[$variationId]->price;
+                    $guestItem['stock'] = $stock;
+                    $guestItem['subtotal'] = round(((float) $guestItem['price']) * $guestQty, 2);
+
                     $userCart[$variationId] = $guestItem;
                 }
             }
