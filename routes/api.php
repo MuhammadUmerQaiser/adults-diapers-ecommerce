@@ -1,7 +1,9 @@
 <?php
 
+use App\Http\Controllers\Api\AdminController;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\CartController;
+use App\Http\Controllers\Api\FaqController;
 use App\Http\Controllers\Api\OrderController;
 use App\Http\Controllers\Api\ProductController;
 use App\Http\Controllers\Api\SocialLoginController;
@@ -49,6 +51,7 @@ Route::controller(CartController::class)->prefix('cart')->group(function () {
 });
 
 Route::post('/webhook/stripe', [OrderController::class, 'webhook'])->name('webhook.stripe');
+Route::get('/faqs', [FaqController::class, 'getFaqs'])->name('faqs.index');
 
 //AUTH USER ROUTES
 Route::middleware('auth:api')->group(function () {
@@ -78,5 +81,21 @@ Route::middleware(['auth:api', 'admin'])->group(function () {
     Route::controller(OrderController::class)->prefix('admin/orders')->group(function () {
         Route::get('/', 'adminIndex')->name('admin.orders.index');                              // All orders (filter by ?status=)
         Route::patch('/{orderNumber}/status', 'updateStatus')->name('admin.orders.status');    // Update status
+    });
+
+    Route::controller(AdminController::class)->prefix('admin')->group(function () {
+        Route::get('/users', 'getAllUsers')->name('admin.users.index');
+        Route::post('/users/{id}', 'updateUser')->name('admin.users.update');
+        Route::delete('/users/{id}', 'deleteUser')->name('admin.users.destroy');
+
+        Route::get('/customers', 'getAllCustomers')->name('admin.customers.index');
+
+        Route::get('/dashboard', 'dashboard')->name('admin.dashboard');
+    });
+
+    Route::controller(FaqController::class)->prefix('admin')->group(function () {
+        Route::post('/faqs', 'addFaq')->name('admin.faqs.store');
+        Route::post('/faqs/{id}', 'updateFaq')->name('admin.faqs.update');
+        Route::delete('/faqs/{id}', 'deleteFaq')->name('admin.faqs.destroy');
     });
 });

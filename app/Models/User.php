@@ -55,6 +55,16 @@ class User extends Authenticatable
         'password' => 'hashed',
     ];
 
+    public function role()
+    {
+        return $this->belongsTo(Role::class);
+    }
+
+    public function orders()
+    {
+        return $this->hasMany(Order::class);
+    }
+
     public function getUserByEmail($email)
     {
         return $this->where('email', $email)->first();
@@ -83,6 +93,7 @@ class User extends Authenticatable
                 'dob' => $request->dob,
                 'phone' => $request->phone,
                 'gender' => $request->gender,
+                'role_id' => $request->role_id ?? 3,
                 'password' => Hash::make($request->password),
             ]);
             $verificationUrl = URL::signedRoute(
@@ -267,5 +278,112 @@ class User extends Authenticatable
         }
     }
 
+    public function getAllUsers(Request $request)
+    {
+        try {
+            $perPage = $request->per_page ?? 15;
 
+            $users = User::with('role')
+                ->where('id', '!=', auth()->id())
+                ->when($request->role_id, fn($q) => $q->where('role_id', $request->role_id))
+                ->when($request->search, function ($q) use ($request) {
+                    $q->where(function ($inner) use ($request) {
+                        $inner->where('firstname', 'like', "%{$request->search}%")
+                            ->orWhere('lastname', 'like', "%{$request->search}%")
+                            ->orWhere('email', 'like', "%{$request->search}%");
+                    });
+                })
+                ->orderBy('created_at', 'desc')
+                ->paginate($perPage);
+
+            return api_success(paginate([
+                'data' => UserResource::collection($users->items()),
+                'meta' => $users->toArray(),
+            ]), 'Users retrieved successfully.');
+
+        } catch (\Exception $e) {
+            return api_error('Something went wrong while retrieving users.', 500, $e->getMessage());
+        }
+    }
+
+    public function updateUser(Request $request, int $id)
+    {
+        try {
+            $user = User::with('role')->findOrFail($id);
+
+            if ($user->id === auth()->id()) {
+                return api_error('You cannot edit your own account here.', 403);
+            }
+
+            $user->update($request->validated());
+
+            return api_success(new UserResource($user->fresh('role')), 'User updated successfully.');
+
+        } catch (\Exception $e) {
+            return api_error('User not found or could not be updated.', 404, $e->getMessage());
+        }
+    }
+
+    public function deleteUser(int $id)
+    {
+        try {
+            $user = User::findOrFail($id);
+
+            if ($user->id === auth()->id()) {
+                return api_error('You cannot delete your own account.', 403);
+            }
+
+            $user->delete();
+
+            return api_success(null, 'User deleted successfully.');
+
+        } catch (\Exception $e) {
+            return api_error('User not found.', 404, $e->getMessage());
+        }
+    }
+
+    public function getAllCustomers(Request $request)
+    {
+        try {
+            $perPage = $request->per_page ?? 15;
+
+            // role_id = 3 assumed for Customer — adjust if different
+            $customers = User::with('role')
+                ->where('role_id', 3)
+                ->withCount('orders')
+                ->withSum('orders as total_spent', 'total')   // sum of order totals
+                ->when($request->search, function ($q) use ($request) {
+                    $q->where(function ($inner) use ($request) {
+                        $inner->where('firstname', 'like', "%{$request->search}%")
+                            ->orWhere('lastname', 'like', "%{$request->search}%")
+                            ->orWhere('email', 'like', "%{$request->search}%");
+                    });
+                })
+                ->orderBy('created_at', 'desc')
+                ->paginate($perPage);
+
+            $mapped = $customers->map(function ($user) {
+                return [
+                    'id' => $user->id,
+                    'firstname' => $user->firstname,
+                    'lastname' => $user->lastname,
+                    'email' => $user->email,
+                    'phone' => $user->phone,
+                    'role' => $user->role?->name,
+                    'orders_count' => $user->orders_count,
+                    'total_spent' => round((float) $user->total_spent, 2),
+                    'image' => $user->image ? asset('images/users/' . $user->image) : null,
+                    'created_at' => $user->created_at->toDateTimeString(),
+                ];
+            });
+
+            return api_success(paginate([
+                'data' => $mapped,
+                'meta' => $customers->toArray(),
+            ]), 'Customers retrieved successfully.');
+
+        } catch (\Exception $e) {
+            return api_error('Something went wrong while retrieving customers.', 500, $e->getMessage());
+        }
+    }
 }

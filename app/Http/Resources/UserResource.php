@@ -25,6 +25,7 @@ class UserResource extends JsonResource
             'gender' => $this->gender,
             'social_id' => $this->social_id ?? null,
             'social_type' => $this->social_type ?? null,
+            'role' => $this->role ? new RoleResource($this->role) : null,
             'email_verifed_at' => $this->email_verified_at ? $this->email_verified_at->toDateTimeString() : null,
             'image' => $this->image ? asset('images/users/' . $this->image) : null,
             'created_at' => $this->created_at->toDateTimeString(),
