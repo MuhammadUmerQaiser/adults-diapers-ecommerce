@@ -22,7 +22,7 @@ class AdminMiddleware
             ], 401);
         }
 
-        if (auth()->user()->role_id !== 1) { // 1 = Admin role
+        if ((int) auth()->user()->role_id !== 1) { // 1 = Admin role
             return response()->json([
                 'success' => false,
                 'message' => 'Forbidden. Admin access required.'
