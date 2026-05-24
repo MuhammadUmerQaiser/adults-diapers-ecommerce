@@ -21,6 +21,11 @@ class ProductController extends Controller
         return $this->product->getAllProducts($request);
     }
 
+    public function getAllProductsAdmin(Request $request)
+    {
+        return $this->product->getAllProductsAdmin($request);
+    }
+
     public function store(AddProductRequest $request)
     {
         return $this->product->addProduct($request);

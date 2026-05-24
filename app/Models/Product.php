@@ -83,6 +83,70 @@ class Product extends Model
                 ->where('is_active', 1)
                 ->orderBy('created_at', 'desc');
 
+            // Filter by product name
+            if ($request->has('search') && !empty($request->search)) {
+                $query->where('name', 'like', '%' . $request->search . '%');
+            }
+
+            // Filter by price range
+            if ($request->has('min_price') || $request->has('max_price')) {
+                $query->whereHas('variations', function ($q) use ($request) {
+                    if ($request->has('min_price') && $request->min_price !== null) {
+                        $q->where('price', '>=', $request->min_price);
+                    }
+                    if ($request->has('max_price') && $request->max_price !== null) {
+                        $q->where('price', '<=', $request->max_price);
+                    }
+                });
+            }
+
+            if ($request->paginated) {
+                $perPage = $request->pagination ?? 10;
+                $products = $query->paginate($perPage);
+
+                $data = [
+                    'data' => ProductResource::collection($products->items()),
+                    'meta' => $products->toArray()
+                ];
+
+                return api_success(paginate($data), 'Products retrieved successfully');
+            } else {
+                $products = $query->get();
+                return api_success(ProductResource::collection($products), 'Products retrieved successfully');
+            }
+        } catch (\Exception $e) {
+            return api_error('Something went wrong while retrieving the products.', 500, $e->getMessage());
+        }
+    }
+
+    public function getAllProductsAdmin(Request $request)
+    {
+        try {
+            $query = Product::with(['category', 'variations.size', 'images'])
+                ->orderBy('created_at', 'desc');
+
+            // Filter by product name
+            if ($request->has('search') && !empty($request->search)) {
+                $query->where('name', 'like', '%' . $request->search . '%');
+            }
+
+            // Filter by price range
+            if ($request->has('min_price') || $request->has('max_price')) {
+                $query->whereHas('variations', function ($q) use ($request) {
+                    if ($request->has('min_price') && $request->min_price !== null) {
+                        $q->where('price', '>=', $request->min_price);
+                    }
+                    if ($request->has('max_price') && $request->max_price !== null) {
+                        $q->where('price', '<=', $request->max_price);
+                    }
+                });
+            }
+
+            // Filter by active status
+            if ($request->has('is_active')) {
+                $query->where('is_active', $request->is_active);
+            }
+
             if ($request->paginated) {
                 $perPage = $request->pagination ?? 10;
                 $products = $query->paginate($perPage);
