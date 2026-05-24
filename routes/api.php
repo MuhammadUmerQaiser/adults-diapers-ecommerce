@@ -74,7 +74,7 @@ Route::middleware('auth:api')->group(function () {
 Route::middleware(['auth:api', 'admin'])->group(function () {
     Route::controller(ProductController::class)->group(function () {
         Route::post('/products', 'store')->name('products.store');
-        Route::get('/products', 'getAllProductsAdmin')->name('products.admin.index');
+        Route::get('/admin/products', 'getAllProductsAdmin')->name('products.admin.index');
         Route::post('/products/{id}', 'update')->name('products.update');
         Route::delete('/products/{id}', 'destroy')->name('products.destroy');
     });
